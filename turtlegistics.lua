@@ -208,6 +208,12 @@ function state:render(message)
         end
     end
 
+    -- draw help bar
+    term.setCursorPos(1, h)
+    theme.primary_muted:apply()
+    term.clearLine()
+    term.write("F5 refresh F6 sort F8 quit")
+
     -- draw search or message bar
     term.setCursorPos(1, h - 1)
     if message then
@@ -223,16 +229,10 @@ function state:render(message)
             theme.primary:apply()
             term.clearLine()
             term.write(self.search)
-            term.setCursorPos(self.searchCursor, h)
+            term.setCursorPos(self.searchCursor, h - 1)
             term.setCursorBlink(true)
         end
     end
-
-    -- draw help bar
-    term.setCursorPos(1, h)
-    theme.primary_muted:apply()
-    term.clearLine()
-    term.write("F5 refresh F6 sort F8 quit")
 end
 
 log("Starting turtlegistics")
