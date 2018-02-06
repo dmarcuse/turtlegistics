@@ -181,7 +181,7 @@ function state:render(message)
     local numDisplayStacks = #self.displayStacks
     self.selectedStack = math.max(1, math.min(self.selectedStack, numDisplayStacks))
 
-    self.pageSize = h - 2
+    self.pageSize = h - 3
     local totalPages = math.ceil(numDisplayStacks / self.pageSize)
     local pageOffset = math.floor((self.selectedStack - 1) / self.pageSize)
     local pageStatus = ("Page %d/%d"):format(pageOffset + 1, totalPages)
@@ -209,7 +209,7 @@ function state:render(message)
     end
 
     -- draw search or message bar
-    term.setCursorPos(1, h)
+    term.setCursorPos(1, h - 1)
     if message then
         theme.primary:apply()
         term.clearLine()
@@ -227,6 +227,12 @@ function state:render(message)
             term.setCursorBlink(true)
         end
     end
+
+    -- draw help bar
+    term.setCursorPos(1, h)
+    theme.primary_muted:apply()
+    term.clearLine()
+    term.write("F5 refresh F6 sort F8 quit")
 end
 
 log("Starting turtlegistics")
@@ -238,7 +244,7 @@ while true do
     local evt = { os.pullEvent() }
 
     if evt[1] == "mouse_scroll" then
-        state.selectedStack = state.selectedStack + (state.pageSize * evt[2])
+        state.selectedStack = state.selectedStack + (3 * evt[2])
         state:render()
     elseif evt[1] == "key" then
         -- hotkeys
@@ -247,6 +253,15 @@ while true do
         elseif evt[2] == keys.f5 then -- refresh
             state:render("Refreshing...")
             state:refresh()
+        elseif evt[2] == keys.f6 then -- change sort mode
+            if state.sortMode == "amount" then
+                state.sortMode = "lexical"
+            else
+                state.sortMode = "amount"
+            end
+            state:render("Sorting...")
+            state:updateDisplayStacks()
+            state:render()
         end
 
         -- navigation
