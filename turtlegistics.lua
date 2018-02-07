@@ -388,7 +388,7 @@ function state:deposit()
                 end
             end
 
-            networkStack.count = networkStack.count + totalDeposited
+            if networkStack then networkStack.count = networkStack.count + totalDeposited end
             self:updateDisplayStacks()
             self:render()
         end
