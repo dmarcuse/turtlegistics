@@ -227,7 +227,7 @@ function state:render(message)
         if self.search == "" then
             theme.primary_muted:apply()
             term.clearLine()
-            term.write("Type to search")
+            term.write("Type to search, enter to pull stack")
         else
             theme.primary:apply()
             term.clearLine()
