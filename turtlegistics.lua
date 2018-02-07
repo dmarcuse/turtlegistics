@@ -102,6 +102,7 @@ state.selectedStack = 1
 
 state.search = ""
 state.searchCursor = 1
+state.didWithdraw = false
 
 function state:updateDisplayStacks()
     self.displayStacks = {}
@@ -235,6 +236,51 @@ function state:render(message)
     end
 end
 
+function state:withdraw(n)
+    local stack = self.displayStacks[self.selectedStack]
+
+    if stack ~= nil then
+        log(("Withdrawing %s x%d"):format(stack.displayName, stack.stackSize))
+        self:render("Withdrawing " .. stack.displayName)
+
+        local needed = n or stack.stackSize
+        local totalWithdrawn = 0
+        local from = {}
+
+        for i, source in ipairs(stack.from) do
+            local amount = math.min(needed, source.count)
+
+            if amount > 0 then
+                local chest = self.chests[source.name]
+
+                local targets = chest.getTransferLocations()
+                local target
+
+                for i, v in ipairs(targets) do
+                    if v:match("^turtle") then
+                        target = v
+                        break
+                    end
+                end
+
+                local transferred = chest.pushItems(target, source.slot, needed)
+                totalWithdrawn = totalWithdrawn + transferred
+                source.count = math.max(0, source.count - transferred)
+                log(("Withdrew %s x%d from %s:%d to %s"):format(stack.displayName, transferred, source.name, source.slot, target))
+
+                needed = math.max(0, needed - transferred)
+            end
+            
+            if needed == 0 then break end
+        end
+
+        stack.count = math.max(0, stack.count - totalWithdrawn)
+        self.didWithdraw = true
+        self:updateDisplayStacks()
+        self:render()
+    end
+end
+
 log("Starting turtlegistics")
 
 state:render("Starting...")
@@ -262,6 +308,8 @@ while true do
             state:render("Sorting...")
             state:updateDisplayStacks()
             state:render()
+        elseif evt[2] == keys.enter then
+            state:withdraw()
         end
 
         -- navigation
@@ -281,11 +329,18 @@ while true do
         
         -- text manipulation for search bar
         if evt[2] == keys.backspace then
-            local prefix = state.search:sub(1, math.max(0, state.searchCursor - 2))
-            local suffix = state.search:sub(state.searchCursor)
+            if state.didWithdraw then
+                state.search = ""
+                state.searchCursor = 1
+                state.didWithdraw = false
+            else
+                local prefix = state.search:sub(1, math.max(0, state.searchCursor - 2))
+                local suffix = state.search:sub(state.searchCursor)
+    
+                state.search = prefix .. suffix
+                state.searchCursor = math.max(state.searchCursor - 1, 1)
+            end
 
-            state.search = prefix .. suffix
-            state.searchCursor = math.max(state.searchCursor - 1, 1)
             state:updateDisplayStacks()
             state:render()
         elseif evt[2] == keys.delete then
@@ -297,23 +352,26 @@ while true do
             state:render()
         elseif evt[2] == keys.left then
             state.searchCursor = math.max(state.searchCursor - 1, 1)
-            state:updateDisplayStacks()
+            
             state:render()
         elseif evt[2] == keys.right then
             state.searchCursor = math.min(state.searchCursor + 1, state.search:len() + 1)
-            state:updateDisplayStacks()
+
             state:render()
         elseif evt[2] == keys.home then
             state.searchCursor = 1
+
             state:render()
         elseif evt[2] == keys["end"] then
             state.searchCursor = state.search:len() + 1
-            state:updateDisplayStacks()
+
             state:render()
         end
     elseif evt[1] == "char" then
         state.search = state.search:sub(1, state.searchCursor) .. evt[2] .. state.search:sub(state.searchCursor + 1)
         state.searchCursor = state.searchCursor + 1
+        state.didWithdraw = false
+
         state:updateDisplayStacks()
         state:render()
     end
