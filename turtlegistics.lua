@@ -33,12 +33,14 @@ local function getChests()
     local chests = {}
 
     for _, name in ipairs(names) do
-        local wrapped = peripheral.wrap(name)
+        if not name:match("^turtle") then
+            local wrapped = peripheral.wrap(name)
 
-        if wrapped.getTransferLocations then
-            log("Found chest " .. name)
-            chests[name] = wrapped
-            chestCount = chestCount + 1
+            if wrapped.getTransferLocations then
+                log("Found chest " .. name)
+                chests[name] = wrapped
+                chestCount = chestCount + 1
+            end
         end
     end
 
@@ -213,7 +215,7 @@ function state:render(message)
     term.setCursorPos(1, h)
     theme.primary_muted:apply()
     term.clearLine()
-    term.write("F5 refresh F6 sort F8 quit")
+    term.write("F5 scan F6 sort F7 insert F8 quit")
 
     -- draw search or message bar
     term.setCursorPos(1, h - 1)
@@ -263,10 +265,12 @@ function state:withdraw(n)
                     end
                 end
 
+                assert(target, "No connection between turtle and " .. source.name)
+
                 local transferred = chest.pushItems(target, source.slot, needed)
                 totalWithdrawn = totalWithdrawn + transferred
                 source.count = math.max(0, source.count - transferred)
-                log(("Withdrew %s x%d from %s:%d to %s"):format(stack.displayName, transferred, source.name, source.slot, target))
+                log(("Transferred %s x%d from %s:%d to %s"):format(stack.displayName, transferred, source.name, source.slot, target))
 
                 needed = math.max(0, needed - transferred)
             end
@@ -278,6 +282,116 @@ function state:withdraw(n)
         self.didWithdraw = true
         self:updateDisplayStacks()
         self:render()
+    end
+end
+
+function state:deposit()
+    self:render("Inserting...")
+
+    for turtleSlot = 1, 16 do
+        local turtleStack = turtle.getItemDetail(turtleSlot)
+
+        if turtleStack then
+            local idx = turtleStack.name .. ";" .. turtleStack.damage
+            local amount = turtleStack.count
+            log(("Inserting %s x%d"):format(idx, amount))
+            local totalDeposited = 0
+
+            local networkStack = self.stacks[idx]
+
+            -- fill existing partial stacks
+            if networkStack then
+                for i, source in ipairs(networkStack.from) do
+                    local freeSpace = math.max(0, networkStack.stackSize - source.count)
+
+                    if freeSpace > 0 then
+                        local chest = self.chests[source.name]
+
+                        local targets = chest.getTransferLocations()
+                        local target
+
+                        for i, v in ipairs(targets) do
+                            if v:match("^turtle") then
+                                target = v
+                                break
+                            end
+                        end
+
+                        assert(target, "No connection between turtle and " .. source.name)
+
+                        local transferred = chest.pullItems(target, turtleSlot, nil, source.slot)
+                        totalDeposited = totalDeposited + transferred
+                        source.count = source.count + transferred
+                        log(("Transferred %s x%d from %s to %s:%d"):format(networkStack.displayName, transferred, target, source.name, source.slot))
+
+                        amount = math.max(0, amount - transferred)
+                    end
+
+                    if amount == 0 then break end
+                end
+            end
+
+            if amount > 0 then
+                -- we need to use an empty slot
+                for name, chest in pairs(self.chests) do
+                    local maxSlot = chest.size()
+
+                    if maxSlot > 0 then
+                        local contents = chest.list()
+
+                        for chestSlot = 1, maxSlot do
+                            if contents[chestSlot] == nil then
+                                -- found a free slot!
+                                local targets = chest.getTransferLocations()
+                                local target
+
+                                for i, v in ipairs(targets) do
+                                    if v:match("^turtle") then
+                                        target = v
+                                        break
+                                    end
+                                end
+
+                                assert(target, "No connection between turtle and " .. name)
+
+                                local transferred = chest.pullItems(target, turtleSlot, nil, chestSlot)
+                                totalDeposited = totalDeposited + transferred
+                                log(("Transferred %s x%d from %s to %s:%d (previously empty slot)"):format(idx, amount, target, name, chestSlot))
+
+                                amount = math.max(0, amount - transferred)
+
+                                if transferred > 0 then
+                                    if networkStack == nil then
+                                        -- create the network stack
+                                        local meta = chest.getItemMeta(chestSlot)
+                                        networkStack = newStack(meta)
+
+                                        networkStack.count = 0 -- this value is set later before the function exits
+
+                                        -- store the new stack
+                                        self.stacks[idx] = networkStack
+                                    end
+                                        
+                                    table.insert(networkStack.from, {
+                                        name = name,
+                                        slot = chestSlot,
+                                        count = transferred
+                                    })
+
+                                    if amount == 0 then break end
+                                end
+                            end
+                        end
+                    end
+
+                    if amount == 0 then break end
+                end
+            end
+
+            networkStack.count = networkStack.count + totalDeposited
+            self:updateDisplayStacks()
+            self:render()
+        end
     end
 end
 
@@ -308,8 +422,10 @@ while true do
             state:render("Sorting...")
             state:updateDisplayStacks()
             state:render()
-        elseif evt[2] == keys.enter then
+        elseif evt[2] == keys.enter then -- withdraw
             state:withdraw()
+        elseif evt[2] == keys.f7 then -- deposit
+            state:deposit()
         end
 
         -- navigation
