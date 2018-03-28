@@ -5,6 +5,16 @@ local logEnabled = settings.get("turtlegistics.log", true)
 
 local transferBlacklist = {}
 
+do
+    local names = peripheral.getNames()
+
+    for _, name in ipairs(names) do
+        if name:match("^turtle") then
+            transferBlacklist[name] = true
+        end
+    end
+end
+
 if logEnabled then
     fs.delete(logFile)
 end
@@ -43,8 +53,6 @@ local function getChests()
                 chests[name] = wrapped
                 chestCount = chestCount + 1
             end
-        else
-            transferBlacklist[name] = true
         end
     end
 
