@@ -3,18 +3,6 @@ assert(turtle, "Program must be run on a turtle")
 local logFile = fs.combine(fs.getDir(shell.getRunningProgram()), "turtlegistics.log")
 local logEnabled = settings.get("turtlegistics.log", true)
 
-local transferBlacklist = {}
-
-do
-    local names = peripheral.getNames()
-
-    for _, name in ipairs(names) do
-        if name:match("^turtle") and peripheral.call(name, "getID") ~= os.getComputerID() then
-            transferBlacklist[name] = true
-        end
-    end
-end
-
 if logEnabled then
     fs.delete(logFile)
 end
@@ -35,6 +23,19 @@ local function log(...)
         f.close()
     end
 end
+
+local transferBlacklist = {}
+
+local function refreshBlacklist()
+    local names = peripheral.getNames()
+
+    for _, name in ipairs(names) do
+        if name:match("^turtle") and peripheral.call(name, "getID") ~= os.getComputerID() then
+            transferBlacklist[name] = true
+        end
+    end
+end
+refreshBlacklist()
 
 local function getChests()
     log("Getting chests")
@@ -142,6 +143,7 @@ end
 
 function state:refresh()
     log("Refreshing inventory")
+    refreshBlacklist()
     self.chests, self.chestCount = getChests()
     self.stacks = getItemStacks(self.chests)
     self:updateDisplayStacks()
@@ -251,6 +253,8 @@ function state:render(message)
 end
 
 function state:withdraw(n)
+    refreshBlacklist()
+    
     local stack = self.displayStacks[self.selectedStack]
 
     if stack ~= nil then
@@ -299,6 +303,8 @@ end
 
 function state:deposit()
     self:render("Inserting...")
+    
+    refreshBlacklist()
 
     for turtleSlot = 1, 16 do
         local turtleStack = turtle.getItemDetail(turtleSlot)
