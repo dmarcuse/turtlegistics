@@ -3,6 +3,8 @@ assert(turtle, "Program must be run on a turtle")
 local logFile = fs.combine(fs.getDir(shell.getRunningProgram()), "turtlegistics.log")
 local logEnabled = settings.get("turtlegistics.log", true)
 
+local transferBlacklist = {}
+
 if logEnabled then
     fs.delete(logFile)
 end
@@ -41,6 +43,8 @@ local function getChests()
                 chests[name] = wrapped
                 chestCount = chestCount + 1
             end
+        else
+            transferBlacklist[name] = true
         end
     end
 
@@ -259,7 +263,7 @@ function state:withdraw(n)
                 local target
 
                 for i, v in ipairs(targets) do
-                    if v:match("^turtle") then
+                    if v:match("^turtle") and not transferBlacklist[v] then
                         target = v
                         break
                     end
@@ -311,7 +315,7 @@ function state:deposit()
                         local target
 
                         for i, v in ipairs(targets) do
-                            if v:match("^turtle") then
+                            if v:match("^turtle") and not transferBlacklist[v] then
                                 target = v
                                 break
                             end
@@ -346,7 +350,7 @@ function state:deposit()
                                 local target
 
                                 for i, v in ipairs(targets) do
-                                    if v:match("^turtle") then
+                                    if v:match("^turtle") and not transferBlacklist[v] then
                                         target = v
                                         break
                                     end
