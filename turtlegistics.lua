@@ -9,7 +9,7 @@ do
     local names = peripheral.getNames()
 
     for _, name in ipairs(names) do
-        if name:match("^turtle") then
+        if name:match("^turtle") and peripheral.call(name, "getID") ~= os.getComputerID() then
             transferBlacklist[name] = true
         end
     end
