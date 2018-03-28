@@ -24,6 +24,19 @@ local function log(...)
     end
 end
 
+local transferBlacklist = {}
+
+local function refreshBlacklist()
+    local names = peripheral.getNames()
+
+    for _, name in ipairs(names) do
+        if name:match("^turtle") and peripheral.call(name, "getID") ~= os.getComputerID() then
+            transferBlacklist[name] = true
+        end
+    end
+end
+refreshBlacklist()
+
 local function getChests()
     log("Getting chests")
 
@@ -130,6 +143,7 @@ end
 
 function state:refresh()
     log("Refreshing inventory")
+    refreshBlacklist()
     self.chests, self.chestCount = getChests()
     self.stacks = getItemStacks(self.chests)
     self:updateDisplayStacks()
@@ -239,6 +253,8 @@ function state:render(message)
 end
 
 function state:withdraw(n)
+    refreshBlacklist()
+    
     local stack = self.displayStacks[self.selectedStack]
 
     if stack ~= nil then
@@ -259,7 +275,7 @@ function state:withdraw(n)
                 local target
 
                 for i, v in ipairs(targets) do
-                    if v:match("^turtle") then
+                    if v:match("^turtle") and not transferBlacklist[v] then
                         target = v
                         break
                     end
@@ -287,6 +303,8 @@ end
 
 function state:deposit()
     self:render("Inserting...")
+    
+    refreshBlacklist()
 
     for turtleSlot = 1, 16 do
         local turtleStack = turtle.getItemDetail(turtleSlot)
@@ -311,7 +329,7 @@ function state:deposit()
                         local target
 
                         for i, v in ipairs(targets) do
-                            if v:match("^turtle") then
+                            if v:match("^turtle") and not transferBlacklist[v] then
                                 target = v
                                 break
                             end
@@ -346,7 +364,7 @@ function state:deposit()
                                 local target
 
                                 for i, v in ipairs(targets) do
-                                    if v:match("^turtle") then
+                                    if v:match("^turtle") and not transferBlacklist[v] then
                                         target = v
                                         break
                                     end
